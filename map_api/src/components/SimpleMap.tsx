@@ -1,146 +1,88 @@
-// imports
 import React, { useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { FaSearch } from "react-icons/fa";
+import L from "leaflet";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
+import { FaSearch } from "react-icons/fa";
 
-// Type-safe Leaflet icon configuration (because we a using typescript)
-delete (L.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: string })
-  ._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+// Simple icon setup (no complex prototype hacking)
+const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
 });
+L.Marker.prototype.options.icon = DefaultIcon;
 
-// Component to handle map view changes
-function ChangeMapView({ coords }: { coords: [number, number] }) {
+// Helper component to move map view
+function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
-  map.setView(coords, map.getZoom());
+  map.setView(center);
   return null;
 }
 
-// props for infering location
-interface Location {
-  lat: number;
-  lng: number;
-  name: string;
-}
-
-const MapWithSearch = () => {
+export default function SimpleMapWithSearch() {
   const [query, setQuery] = useState("");
-  const [location, setLocation] = useState<Location | null>(null);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [position, setPosition] = useState<[number, number]>([51.505, -0.09]);
+  const [locationName, setLocationName] = useState("London");
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setIsLoading(true);
-
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           query
         )}`
       );
-
       const data = await response.json();
 
-      if (!data || data.length === 0) {
-        throw new Error("Location not found");
+      if (data.length > 0) {
+        const newPos: [number, number] = [
+          parseFloat(data[0].lat),
+          parseFloat(data[0].lon),
+        ];
+        setPosition(newPos);
+        setLocationName(data[0].display_name);
       }
-
-      const firstResult = data[0];
-      setLocation({
-        lat: parseFloat(firstResult.lat),
-        lng: parseFloat(firstResult.lon),
-        name: firstResult.display_name,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const locateUser = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            name: "Your current location",
-          });
-        },
-        (error) => {
-          console.error("Failed to retrieve location: ", error);
-          setError("Unable to retrieve your location");
-        }
-      );
+    } catch (error) {
+      console.error("Search failed:", error);
     }
   };
 
   return (
-    <div className="h-screen flex flex-col space-y-6">
-      {/* Search Header */}
-      <div className="p-4 bg-gray-50 border-b rounded-lg">
+    <div className="flex flex-col h-screen space-y-6">
+      {/* Search Bar */}
+      <div className="p-4 bg-white shadow-md rounded-lg">
         <form
           onSubmit={handleSearch}
-          className="lg:flex lg:flex-row flex flex-col gap-2 text-background">
+          className="md:flex md:flex-row flex flex-col gap-2 text-background">
           <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for a location..."
-            className="flex-1 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Search location..."
+            className="flex-1 p-2 border rounded"
           />
           <Button
             type="submit"
-            disabled={isLoading}
-            className="flex gap-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400">
-            {isLoading ? "Searching..." : "Search"}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            Search
             <FaSearch />
           </Button>
-          <Button
-            type="button"
-            onClick={locateUser}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-            📍 My Location
-          </Button>
         </form>
-        {error && <div className="mt-2 text-red-500">{error}</div>}
       </div>
 
-      {/* Map Container */}
+      {/* Map */}
       <div className="flex-1">
-        <MapContainer
-          center={[9.082, 8.6753]} // Default center coordinate (Nigeria)
-          zoom={6}
-          className="h-full w-full">
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          {location && (
-            <>
-              <ChangeMapView coords={[location.lat, location.lng]} />
-              <Marker position={[location.lat, location.lng]}>
-                <Popup className="text-sm font-medium max-w-[200px]">
-                  {location.name}
-                </Popup>
-              </Marker>
-            </>
-          )}
+        <MapContainer center={position} zoom={13} className="h-full w-full">
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <ChangeView center={position} />
+          <Marker position={position}>
+            <Popup>{locationName}</Popup>
+          </Marker>
         </MapContainer>
       </div>
     </div>
   );
-};
-
-export default MapWithSearch;
+}
