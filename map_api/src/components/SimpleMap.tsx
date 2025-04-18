@@ -62,7 +62,7 @@ export default function SimpleMapWithSearch() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search location..."
-            className="flex-1 p-2 border rounded"
+            className="flex-1 p-2 border rounded text-black"
           />
           <Button
             type="submit"
