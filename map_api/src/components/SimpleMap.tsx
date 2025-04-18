@@ -5,8 +5,9 @@ import L from "leaflet";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { FaSearch } from "react-icons/fa";
+import { ClockLoader } from "react-spinners";
 
-// Simple icon setup (no complex prototype hacking)
+// Simple icon setup for Location
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
@@ -15,7 +16,6 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Helper component to move map view
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   map.setView(center);
@@ -26,9 +26,11 @@ export default function SimpleMapWithSearch() {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState<[number, number]>([51.505, -0.09]);
   const [locationName, setLocationName] = useState("London");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
@@ -45,8 +47,13 @@ export default function SimpleMapWithSearch() {
         setPosition(newPos);
         setLocationName(data[0].display_name);
       }
+      console.log(data);
+      console.log(data[0].display_name);
     } catch (error) {
       console.error("Search failed:", error);
+      setIsLoading(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -66,11 +73,17 @@ export default function SimpleMapWithSearch() {
           />
           <Button
             type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-            Search
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            disabled={isLoading}>
+            {isLoading ? <ClockLoader size={23} color="white" /> : "Search"}
             <FaSearch />
           </Button>
         </form>
+        {locationName && (
+          <p className="flex flex-col text-lg mt-4 text-black font-bold">
+            Current Location: {locationName}
+          </p>
+        )}
       </div>
 
       {/* Map */}
